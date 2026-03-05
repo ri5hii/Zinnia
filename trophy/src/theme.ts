@@ -72,7 +72,7 @@ export const COLORS: { [name: string]: Theme } = {
 		DEFAULT_RANK_TEXT: "#333",
 	},
 	onedark: {
-		BACKGROUND: "#282c34",
+		BACKGROUND: "#151515",
 		TITLE: "#e5c07b",
 		ICON_CIRCLE: "#FFF",
 		TEXT: "#e06c75",
