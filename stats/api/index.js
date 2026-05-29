@@ -1,10 +1,8 @@
 // stats/src/cards/gist.ts
-import { createRequire } from "module";
+import { createRequire as createRequire2 } from "module";
 
 // stats/src/common/utils.ts
-import axios from "axios";
-import toEmoji from "emoji-name-map";
-import wrap from "word-wrap";
+import { createRequire } from "module";
 
 // stats/themes/index.js
 var themes = {
@@ -506,6 +504,8 @@ var CustomError = class extends Error {
 };
 
 // stats/src/common/utils.ts
+var require2 = createRequire(import.meta.url);
+var emojiMap = null;
 var ERROR_CARD_LENGTH = 576.5;
 var flexLayout = ({
   items,
@@ -589,12 +589,16 @@ var fallbackColor = (color, fallbackColor2) => {
   return (gradient ? gradient : isValidHexColor(color || "") && `#${color}`) || fallbackColor2;
 };
 var request = (data, headers) => {
-  return axios({
-    url: "https://api.github.com/graphql",
+  return fetch("https://api.github.com/graphql", {
     method: "post",
     headers,
-    data
-  });
+    body: JSON.stringify(data)
+  }).then(
+    (res) => res.json().then((responseData) => ({
+      data: responseData,
+      statusText: res.statusText
+    }))
+  );
 };
 var getCardColors = ({
   title_color,
@@ -699,7 +703,7 @@ var wrapTextMultiline = (text, width = 59, maxLines = 3) => {
   if (isChinese) {
     wrapped = encoded.split(fullWidthComma);
   } else {
-    wrapped = wrap(encoded, { width }).split("\n");
+    wrapped = encoded.split(/\r?\n/).flatMap((line) => wrapLine(line, width));
   }
   const lines = wrapped.map((line) => line.trim()).slice(0, maxLines);
   if (wrapped.length > maxLines) {
@@ -854,11 +858,41 @@ var chunkArray = (arr, perChunk) => {
     return resultArray;
   }, []);
 };
+var wrapLine = (line, width) => {
+  if (!line.trim()) return [];
+  const words = line.trim().split(/\s+/).filter(Boolean);
+  const wrapped = [];
+  let current = "";
+  for (const word of words) {
+    if (!current) {
+      current = word;
+      continue;
+    }
+    if (`${current} ${word}`.length <= width) {
+      current = `${current} ${word}`;
+      continue;
+    }
+    wrapped.push(current);
+    if (word.length > width) {
+      for (let index = 0; index < word.length; index += width) {
+        wrapped.push(word.slice(index, index + width));
+      }
+      current = "";
+    } else {
+      current = word;
+    }
+  }
+  if (current) wrapped.push(current);
+  return wrapped;
+};
 var parseEmojis = (str) => {
   if (!str) throw new Error("[parseEmoji]: str argument not provided");
-  const emojiMap = toEmoji;
+  if (!emojiMap) {
+    emojiMap = require2("emoji-name-map");
+  }
+  const map = emojiMap;
   return str.replace(/:\w+:/gm, (emoji) => {
-    return emojiMap.get(emoji) || "";
+    return map.get(emoji) || "";
   });
 };
 var formatBytes = (bytes) => {
@@ -1108,8 +1142,8 @@ var rankIcon = (rankIconType, rankLevel, percentile) => {
 };
 
 // stats/src/cards/gist.ts
-var require2 = createRequire(import.meta.url);
-var languageColors = require2("../common/languageColors.json");
+var require3 = createRequire2(import.meta.url);
+var languageColors = require3("../common/languageColors.json");
 var ICON_SIZE = 16;
 var CARD_DEFAULT_WIDTH = 400;
 var HEADER_MAX_LENGTH = 35;

@@ -1,8 +1,9 @@
-import axios from "axios";
-import toEmoji from "emoji-name-map";
-import wrap from "word-wrap";
+import { createRequire } from "node:module";
 import { themes } from "../../themes/index.js";
 import { SECONDARY_ERROR_MESSAGES, TRY_AGAIN_LATER } from "./error.js";
+
+const require = createRequire(import.meta.url);
+let emojiMap: { get(key: string): string | undefined } | null = null;
 
 export const ERROR_CARD_LENGTH = 576.5;
 
@@ -121,12 +122,16 @@ export const fallbackColor = (
 };
 
 export const request = (data: unknown, headers: Record<string, string>) => {
-	return axios({
-		url: "https://api.github.com/graphql",
+	return fetch("https://api.github.com/graphql", {
 		method: "post",
 		headers,
-		data,
-	});
+		body: JSON.stringify(data),
+	}).then((res) =>
+		res.json().then((responseData) => ({
+			data: responseData,
+			statusText: res.statusText,
+		})),
+	);
 };
 
 type CardThemeOptions = {
@@ -262,7 +267,7 @@ export const wrapTextMultiline = (text: string, width = 59, maxLines = 3) => {
 	if (isChinese) {
 		wrapped = encoded.split(fullWidthComma);
 	} else {
-		wrapped = wrap(encoded, { width }).split("\n");
+		wrapped = encoded.split(/\r?\n/).flatMap((line) => wrapLine(line, width));
 	}
 	const lines = wrapped.map((line) => line.trim()).slice(0, maxLines);
 	if (wrapped.length > maxLines) {
@@ -317,13 +322,49 @@ export const chunkArray = <T>(arr: T[], perChunk: number): T[][] => {
 	}, [] as T[][]);
 };
 
+const wrapLine = (line: string, width: number): string[] => {
+	if (!line.trim()) return [];
+
+	const words = line.trim().split(/\s+/).filter(Boolean);
+	const wrapped: string[] = [];
+	let current = "";
+
+	for (const word of words) {
+		if (!current) {
+			current = word;
+			continue;
+		}
+
+		if (`${current} ${word}`.length <= width) {
+			current = `${current} ${word}`;
+			continue;
+		}
+
+		wrapped.push(current);
+		if (word.length > width) {
+			for (let index = 0; index < word.length; index += width) {
+				wrapped.push(word.slice(index, index + width));
+			}
+			current = "";
+		} else {
+			current = word;
+		}
+	}
+
+	if (current) wrapped.push(current);
+	return wrapped;
+};
+
 export const parseEmojis = (str: string) => {
 	if (!str) throw new Error("[parseEmoji]: str argument not provided");
-	const emojiMap = toEmoji as unknown as {
-		get(key: string): string | undefined;
-	};
+	if (!emojiMap) {
+		emojiMap = require("emoji-name-map") as {
+			get(key: string): string | undefined;
+		};
+	}
+	const map = emojiMap;
 	return str.replace(/:\w+:/gm, (emoji) => {
-		return emojiMap.get(emoji) || "";
+		return map.get(emoji) || "";
 	});
 };
 
